@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+release/
+*.tsbuildinfo
+
+# Test and evaluation output
+coverage/
+tests/extraction/evaluation/reports/
+
+# Scratch documents — real PDFs must never be committed.
+# See .claude/rules/no-customer-documents.md and ADR-0009.
+scratch/
+*.local.pdf
+
+# Local config
+.claude/settings.local.json
+.env
+.env.*
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
