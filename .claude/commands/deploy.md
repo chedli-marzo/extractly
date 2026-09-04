@@ -1,6 +1,6 @@
 ---
 description: Phase 5 — build, package, and verify the release
-argument-hint: [target, e.g. mac | win | linux]
+argument-hint: [target, e.g. win | mac]
 ---
 
 # Phase 5 — DEPLOY

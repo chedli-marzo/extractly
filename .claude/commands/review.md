@@ -18,7 +18,8 @@ Verify the implementation against the approved user story before any deployment.
 - **Error handling** — failure paths surface, never silently swallow.
 - **Security** — Electron hardening (`contextIsolation`, no `nodeIntegration`,
   the preload `contextBridge` as the only renderer↔main channel), no network
-  egress beyond `127.0.0.1:11434`, no document contents in logs or telemetry.
+  egress beyond the loopback-only local AI endpoint, no document contents in
+  logs or telemetry.
 - **Data integrity** — migrations, provenance preserved, no invented values,
   human-review gate intact.
 - **Performance** — where the story made it relevant.
