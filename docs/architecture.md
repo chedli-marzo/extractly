@@ -2,9 +2,59 @@
 
 ## Shape
 
-One desktop application. One local database. Later, one local model runtime. No
-server, no sync, no shared state between machines. See
-[ADR-0003](decisions/0003-local-first-architecture.md).
+One desktop application. One local database. Later, one local model runtime.
+
+**Solo mode** — the MVP — has no server, no sync, and no shared state between
+machines ([ADR-0003](decisions/0003-local-first-architecture.md)).
+
+**Team mode** — post-MVP — adds one thing and only one thing: a synchronisation
+boundary that publishes *approved structured data* to a shared cloud store, so
+that a team sees the same approved information
+([ADR-0011](decisions/0011-team-collaboration-and-cloud-structured-data.md)).
+Everything to the left of that boundary is identical in both modes.
+
+```
+                     DESKTOP
+┌──────────────────────────────────────┐
+│ PDF                                  │
+│ ↓                                    │
+│ Local document processing            │
+│ ↓                                    │
+│ Local AI inference                   │
+│ ↓                                    │
+│ Candidate extraction                 │
+│ ↓                                    │
+│ Human review / approval              │
+│ ↓                                    │
+│ Local structured data                │
+│ ↓                                    │
+│ Sync layer            ← team mode only
+└──────────────────┬───────────────────┘
+                   │  approved structured data only
+                   ↓
+              Cloud API
+                   │
+                   ↓
+          shared relational store
+                   │
+                   ↓
+              Team users
+```
+
+The rule that governs the boundary:
+
+> **Only human-approved normalised structured data and explicitly allowed
+> metadata may leave the local machine. Source representations and
+> unapproved or raw document content remain local.**
+
+PDFs, page images, text blocks, provenance, raw values, quotes, coordinates,
+and correction history stay on the machine in both modes.
+
+The first team implementation is a vendor-hosted cloud API over PostgreSQL. The
+same architecture must remain deployable customer-hosted, which is a later
+enterprise option. The desktop application never holds database credentials —
+it talks to the API, and the API owns the database and every authorization
+rule.
 
 ## The pipeline
 
@@ -166,6 +216,16 @@ migrations applied in order at startup inside a transaction, tracked with
 `PRAGMA user_version`. Repository functions return domain types. No ORM, no
 query builder, no lazy loading. Schema in [data-model.md](data-model.md).
 
+**Repository functions are `async`, deliberately, even though `better-sqlite3` is
+synchronous and every one of them resolves immediately.** This is the one place
+the code is shaped by something it does not yet do. Every database driver that
+is not SQLite is asynchronous, so a synchronous signature here would put the
+cost of a future persistence backend on every call site rather than on this
+layer. The keyword costs nothing today; changing several hundred call sites
+later would not. It does not make anything concurrent, it does not move work off
+the main thread, and it changes nothing about ADR-0004 — slow work still belongs
+in the pipeline worker, without exception.
+
 ### `packages/shared`
 
 Types only, no runtime dependencies: the IPC contract, domain types, and the
@@ -238,6 +298,22 @@ The application fails loudly and locally.
 - Schema validation fails → the document reaches review with the failure
   visible, never with fields quietly dropped.
 
+## Where the sync boundary lives
+
+At the **application boundary**, in `apps/desktop`, alongside every other
+privileged concern. Not in `packages/extraction`, and not in
+`packages/database`.
+
+This is not a style preference. `packages/extraction` never importing Electron
+is what lets the evaluation harness run headlessly; it must never import HTTP,
+authentication, or a cloud client either. A pipeline that knows whether it is
+running in solo or team mode has already lost the property that makes it
+testable.
+
+`packages/database` remains the local store. Synchronisation reads approved
+records from it and publishes them; it is not a second backend behind the same
+repository functions.
+
 ## Deliberately absent
 
 No plugin system. No event bus. No dependency-injection container. No repository
@@ -247,3 +323,7 @@ desktop app.
 Three seams exist for replaceability and no more: `DocumentParser`,
 `ExtractionProvider`, `OcrEngine`. Do not add a fourth for theoretical future
 flexibility.
+
+Team mode's sync layer is a boundary in the same sense but is deliberately not
+listed as a fourth seam: it has no second implementation to swap, and it does
+not sit inside the pipeline. It is a publisher at the edge of the application.

@@ -23,3 +23,5 @@ wrong without context. Do not write one for routine implementation choices.
 | 0007 | Model selection deferred          | Accepted |
 | 0008 | Evaluation dataset before AI      | Accepted |
 | 0009 | Synthetic fixtures only           | Accepted |
+| 0010 | Licensing and paid distribution   | Proposed |
+| 0011 | Team collaboration and cloud structured data | Proposed |

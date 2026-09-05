@@ -15,7 +15,14 @@ PDF
 → local database / export
 ```
 
-There is no server. There is no account. The user's machine is the whole system.
+In **solo mode** — the MVP — there is no server, no account, and the user's
+machine is the whole system.
+
+**Team mode** is post-MVP and not implemented. It adds one boundary at the edge
+of the application: approved normalised structured data may be synchronised so a
+team shares it. Source representations never are — not the PDF, not page images,
+not text blocks, not provenance, not raw values, not correction history. See
+[ADR-0011](docs/decisions/0011-team-collaboration-and-cloud-structured-data.md).
 
 ## Claude Code is not the application's AI
 
@@ -42,7 +49,10 @@ inference runtime and never on Claude, Anthropic, or any hosted API. Nothing in
 3. AI inference must run locally.
 4. No external AI API in MVP.
 5. No telemetry containing document contents.
-6. Extracted data remains local.
+6. Extracted data remains local in solo mode. In team mode, only human-approved
+   normalised structured data and explicitly allowed metadata may leave the
+   machine; source representations and unapproved or raw document content
+   remain local.
 7. Human review is mandatory before treating extraction as approved.
 8. Never silently invent missing values.
 9. Preserve extraction provenance where practical.

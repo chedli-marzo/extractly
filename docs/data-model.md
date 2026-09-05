@@ -179,7 +179,8 @@ resolved, which is what the review UI sorts by.
 CREATE TABLE review (
   id            TEXT PRIMARY KEY,
   run_id        TEXT NOT NULL REFERENCES extraction_run(id) ON DELETE CASCADE,
-  reviewer      TEXT NOT NULL,               -- local OS user; no accounts in MVP
+  reviewer_actor_id TEXT NOT NULL,           -- stable id; see "Actor identity"
+  reviewer_name TEXT NOT NULL,               -- display only, may change
   state         TEXT NOT NULL,               -- 'IN_PROGRESS'|'COMPLETED'|'ABANDONED'
   started_at    TEXT NOT NULL,
   completed_at  TEXT
@@ -212,11 +213,25 @@ CREATE TABLE approved_extraction (
   review_id     TEXT NOT NULL REFERENCES review(id),
   schema_id     TEXT NOT NULL REFERENCES schema_definition(id),
   payload_json  TEXT NOT NULL,               -- fully resolved, denormalised snapshot
-  approved_by   TEXT NOT NULL,
+  approved_by_actor_id TEXT NOT NULL,        -- stable id; see "Actor identity"
+  approved_by_name TEXT NOT NULL,            -- display only, may change
   approved_at   TEXT NOT NULL
 );
 CREATE INDEX idx_approved_document ON approved_extraction(document_id, approved_at);
 ```
+
+### Actor identity
+
+`reviewer_actor_id` and `approved_by_actor_id` are stable identifiers, not OS
+usernames. In solo mode the id is minted once per installation and stored in
+local settings; the display name may still come from the OS. In team mode it is
+the authenticated user's id.
+
+An OS username is meaningless across machines — `admin` is three different
+people — and these two columns are the record of *who signed off on what*. They
+are the only columns whose meaning cannot be reconstructed later if it was
+never captured, which is why the split lands now rather than when team mode is
+built. `field_correction` inherits attribution through its `review_id`.
 
 `payload_json` is a **snapshot**, deliberately denormalised. It is what exports
 read. It stays readable even if `core/` changes how values are assembled, and
@@ -244,6 +259,43 @@ Numbered SQL files in `packages/database/migrations/`, applied in order at start
 a transaction, tracked with `PRAGMA user_version`. Forward-only. A migration
 may never rewrite `approved_extraction.payload_json` or delete from
 `field_correction`.
+
+## Synchronisation (team mode, post-MVP)
+
+Not implemented. Recorded so that later work cannot place the boundary
+somewhere more convenient
+([ADR-0011](decisions/0011-team-collaboration-and-cloud-structured-data.md)).
+
+The rule:
+
+> **Only human-approved normalised structured data and explicitly allowed
+> metadata may leave the local machine. Source representations and
+> unapproved or raw document content remain local.**
+
+Eligible to synchronise: `approved_extraction.payload_json` — normalised,
+human-approved values only — the `schema_definition` name and version it was
+approved against, the actor and timestamp attribution on its `review`, and
+`document.filename` with the identifiers needed to address the record.
+`filename` is classified as **metadata**, not extracted document content: it
+identifies a record for a colleague and does not carry document contents.
+
+Never synchronised: `document.stored_path` and the blobs it points at,
+`document_page` including `render_path`, `text_block`, `field_provenance`
+(quotes and coordinates), `extraction_run` including `raw_output`,
+`extracted_field` including `raw_value`, and `field_correction` before/after
+values. These are the source representation and the unapproved candidate
+material.
+
+**Concurrency.** Shared records use optimistic concurrency: a synchronised
+record carries a version, and a save against a stale version is rejected and
+returned for explicit resolution. No last-write-wins, and no silent merge — an
+approved record that changed without anyone approving the change is the failure
+this prevents. The version lives on the shared record; no local column changes
+until team mode is built.
+
+**Known limitation, accepted.** Provenance stays local, so a colleague reading a
+synchronised record sees the approved values and who approved them, not the page
+and quote behind them. Not designed around for now.
 
 ## Retention
 

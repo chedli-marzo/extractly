@@ -1,8 +1,39 @@
 # Security and data locality
 
-The product promise is that a document put into this application does not leave
-the machine. Everything here exists to make that promise checkable rather than
+The product promise is that **a document put into this application does not
+leave the machine** — its PDF, its page images, its text, its coordinates, its
+provenance. Everything here exists to make that promise checkable rather than
 asserted.
+
+The promise is about the *document*, and one mode extends beyond it.
+
+## The privacy boundary
+
+| Mode | Boundary |
+| ---- | -------- |
+| **Solo** (MVP) | Nothing leaves the machine. No cloud, no network requirement. |
+| **Team** (post-MVP) | Document contents still never leave. *Approved structured data* may be synchronised to the customer's shared cloud store. |
+
+The application is therefore not permanently offline in every configuration,
+and this documentation does not claim it is. What is invariant across both
+modes:
+
+> **Only human-approved normalised structured data and explicitly allowed
+> metadata may leave the local machine. Source representations and
+> unapproved or raw document content remain local.**
+
+Never transmitted, in any mode: original PDFs, PDF binaries, page images and
+renders, text blocks, bounding boxes, provenance quotes, raw pre-normalisation
+values, candidate extractions, raw model output, and correction history.
+
+Transmitted in team mode only: approved normalised structured records, the
+schema name and version they were approved against, attribution — who reviewed,
+who approved, when — and the original filename as identifying metadata. See
+[ADR-0011](decisions/0011-team-collaboration-and-cloud-structured-data.md).
+
+Team mode requires authentication and two roles, and the desktop application
+never holds database credentials: it reaches a cloud API which owns the database
+and enforces every authorization rule. None of it is implemented.
 
 ## Threat model
 
@@ -10,6 +41,14 @@ The adversary is not a targeted attacker. It is **accidental egress**: a
 dependency that phones home, a crash reporter that attaches a page image, an
 autofill that posts to a search endpoint, a "helpful" cloud fallback added under
 deadline. The controls below are aimed at that.
+
+Team mode does not change that threat model — it sharpens it. Once a legitimate
+outbound channel exists, the realistic failure becomes **scope creep on that
+channel**: syncing text blocks "so remote reviewers can see the source", or
+attaching a page image to a sync error report. The defence is that the sync
+payload is a fixed, typed shape which structurally cannot carry document
+representation, asserted by a test — the same pattern used for the loopback
+allowlist below.
 
 Out of scope for MVP: a compromised host OS, a malicious local user with disk
 access, and physical access. The database is not encrypted at rest in MVP —
@@ -21,6 +60,9 @@ The locality guarantees below are the enforcement half of
 
 ## Locality guarantees
 
+These are the MVP (solo mode) guarantees, and all but the last remain true in
+team mode.
+
 | Guarantee                              | Enforced by                                    |
 | -------------------------------------- | ---------------------------------------------- |
 | PDFs are never uploaded                | No network egress path exists in the codebase  |
@@ -29,6 +71,10 @@ The locality guarantees below are the enforcement half of
 | No external AI API                     | Loopback-only allowlist, asserted in tests     |
 | No telemetry with document content     | No telemetry at all in MVP                     |
 | Extracted data stays local             | Export writes only to a user-chosen path       |
+
+The last row is the one team mode changes: approved structured data may be
+synchronised. Every other row holds in both modes, and the document
+representation is covered by rows one and two in both modes.
 
 ### The only permitted network destination
 

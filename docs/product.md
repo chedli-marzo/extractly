@@ -18,9 +18,41 @@ that are commercially sensitive and often contractually forbidden from leaving
 the company network. That constraint is why this is a desktop application and
 not a web service.
 
+## Two modes
+
+**Solo mode** is the MVP. One machine, one user, no account, no network
+requirement:
+
+```
+PDF → local parsing → local AI → human review → local SQLite
+```
+
+**Team mode** is post-MVP. Extraction stays local; only *approved structured
+data* is synchronised so a team shares one view of what has been signed off:
+
+```
+PDF → local parsing → local AI → human review → local structured data
+                                                        ↓
+                                                   cloud sync
+                                                        ↓
+                                                shared team data
+```
+
+Only human-approved normalised structured data and explicitly allowed metadata
+may leave the machine. Source representations and unapproved or raw document
+content — PDFs, page images, text blocks, provenance, raw values, correction
+history — stay local in both modes.
+
+Team mode gives a team one shared view of what has been approved, with two
+roles: **Member/Reviewer** (extract, edit, submit) and **Approver** (approve
+into the shared store). A colleague sees the approved values and who approved
+them; provenance stays on the machine that produced it, which is an accepted
+limitation for now. See
+[ADR-0011](decisions/0011-team-collaboration-and-cloud-structured-data.md).
+
 ## MVP
 
-The MVP supports:
+The MVP is solo mode. It supports:
 
 - PDF import
 - local PDF parsing
@@ -38,7 +70,7 @@ The MVP supports:
 ## MVP does not include
 
 - cloud processing
-- cloud storage
+- cloud storage of documents, page images, or the document representation
 - SaaS accounts
 - multi-user collaboration
 - online dashboards
@@ -55,6 +87,7 @@ The MVP supports:
 | Table extraction beyond deterministic reconstruction | Diminishing returns before review UX exists |
 | Batch / folder watch import | Single-document flow must be correct first                  |
 | Custom schema editor in UI  | Schemas ship as code in MVP                                 |
+| Team collaboration (cloud sync of approved data) | Solo mode must be correct first; see ADR-0011 |
 | Model fine-tuning           | Requires an approved-data corpus that does not exist yet     |
 
 ## The review contract
@@ -78,6 +111,12 @@ Before any model is involved, one question has to be answered:
 > Can we reliably turn a real 200-page engineering PDF into a local, searchable
 > document representation where every piece of extracted text maps back to its
 > exact page and bounding box?
+
+It is answered by measurement, not impression. The bar: bounding boxes within
+±2 pt, ≥ 99 % character recall per page with no expected block missing entirely,
+and exact reading order — scored by the harness in
+[tests/extraction/README.md](../tests/extraction/README.md), which states each
+threshold and why it is set there.
 
 The deliverable is import → parse → text blocks with bounding boxes → SQLite →
 a page viewer that highlights any block on demand. No AI
