@@ -110,22 +110,39 @@ without a desktop runtime actually are.
 
 ```
 apps/
-  desktop/            Electron application
+  desktop/            @app/desktop     Electron application
     src/main/         main process: lifecycle, windows, IPC, orchestration
     src/preload/      contextBridge — the only renderer↔main channel
     src/renderer/     React UI shell and routing
 packages/
-  shared/             types, JSON Schemas, IPC contract. No runtime deps.
-  database/           SQLite schema, migrations, repositories
-  extraction/         document processing + extraction provider interface
-  ui/                 React components, presentational
+  shared/             @app/shared      types, JSON Schemas, IPC contract
+  database/           @app/database    SQLite schema, migrations, repositories
+  extraction/         @app/extraction  processing + provider interface
+  ui/                 @app/ui          React components, presentational
 tests/
   extraction/         evaluation dataset and scoring harness
+  workspace/          asserts the dependency graph below
 docs/
   decisions/          ADRs
 ```
 
-Dependency direction, enforced in review and by lint:
+Every package is `private` and never published. The `@app` scope is a
+deliberately neutral placeholder: naming the packages after a product that has
+not been decided would cost a rename later for no benefit now.
+
+Libraries ship TypeScript source. `exports` maps `types` to the emitted
+`dist/index.d.ts` and the runtime condition to `src/index.ts`, so `tsc -b`
+typechecks against declarations while Vitest and the renderer bundler load
+source directly. Only `apps/desktop` produces a bundle; the four libraries emit
+declarations and nothing else (`composite` with `emitDeclarationOnly`). Four
+library build configs would be four configs to maintain for output no one
+consumes.
+
+There are no cross-package TypeScript path aliases. An alias would let a
+package import what it does not declare, which is exactly the failure the
+layout exists to prevent.
+
+Dependency direction, enforced in three independent layers:
 
 ```
 apps/desktop ──► ui ──────────► shared
@@ -137,6 +154,17 @@ apps/desktop ──► ui ──────────► shared
 `apps/desktop`, and `packages/extraction` never imports Electron. That is what
 lets the evaluation harness in `tests/extraction/` run headlessly in Vitest
 ([ADR-0008](decisions/0008-evaluation-dataset-before-ai.md)).
+
+The three layers fail differently, which is why all three exist:
+
+1. **pnpm's strict `node_modules`** — an undeclared import does not resolve at
+   all. Free, and structural rather than advisory.
+2. **ESLint `no-restricted-imports`** — catches an import statement for
+   `electron`, for `@app/desktop`, or for a relative path escaping into
+   `apps/`.
+3. **`tests/workspace/dependency-graph.test.ts`** — reads every manifest and
+   asserts the edges above, catching a dependency declared but not yet
+   imported, and `@app/shared` acquiring any runtime dependency at all.
 
 `packages/ui` is presentational: it takes props and emits events. It does not
 call IPC.
