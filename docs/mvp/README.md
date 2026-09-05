@@ -6,6 +6,10 @@ Twelve milestones in three phases. Each has its own file with its user stories.
 each milestone from what that milestone actually cost. MS-04 carries most of
 the uncertainty and is the one most likely to move.
 
+A story is marked **✅ Done** in its heading only after Phase 4 review passes,
+with a `**Status:**` line recording what the review found. Marking it before
+review makes the label mean nothing.
+
 ## Phases
 
 | Phase | Milestones | What it proves |

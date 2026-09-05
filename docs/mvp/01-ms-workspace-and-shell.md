@@ -19,7 +19,7 @@ that every later milestone lands on a floor that already holds.
 
 ---
 
-## US-01 — Workspace scaffold · `2d`
+## US-01 — Workspace scaffold · `2d` · **✅ Done**
 
 **As a** developer, **I want** the pnpm workspace and its packages to exist with
 TypeScript and Vitest configured, **so that** code has somewhere to live and a
@@ -31,6 +31,12 @@ way to be tested.
 - Dependency direction is enforced: a lint rule fails a build where `packages/extraction` or `packages/database` imports from `apps/desktop`
 - `packages/shared` has no runtime dependencies
 - Lockfile committed; install scripts disabled by default
+
+**Status:** Done, 2026-09-05. All six criteria verified, both guards proven to
+fail on purpose before being trusted. Review found one real defect — the import
+ban covered `packages/*/src` only, so a test file inside a package and the whole
+evaluation harness could import Electron with lint passing — fixed and
+re-proven.
 
 **Carried forward from implementation**
 
