@@ -73,7 +73,12 @@ describe('workspace dependency graph', () => {
   it.each(manifests.map((m) => [m.name, m] as const))(
     '%s declares only permitted workspace dependencies',
     (name, manifest) => {
-      const declared = Object.keys(manifest.dependencies ?? {});
+      // Only `@app/*` edges are checked here. A third-party runtime dependency
+      // is a dependency-policy question for review, not a layering violation —
+      // and `@app/shared` keeps its absolute rule in the next test regardless.
+      const declared = Object.keys(manifest.dependencies ?? {}).filter((dep) =>
+        dep.startsWith('@app/'),
+      );
       const allowed = allowedDependencies[name];
       expect(allowed, `unknown package ${name}`).toBeDefined();
       expect(declared.sort()).toEqual([...(allowed ?? [])].sort());

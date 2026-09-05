@@ -114,6 +114,7 @@ apps/
     src/main/         main process: lifecycle, windows, IPC, orchestration
     src/preload/      contextBridge — the only renderer↔main channel
     src/renderer/     React UI shell and routing
+    src/worker/       utilityProcess pipeline worker: ids in, results out
 packages/
   shared/             @app/shared      types, JSON Schemas, IPC contract
   database/           @app/database    SQLite schema, migrations, repositories
@@ -304,6 +305,26 @@ export.
 
 Content addressing means a filename taken from a document never becomes a path
 on disk. Original filenames are display strings only.
+
+## Build output
+
+electron-vite emits four artifacts under `apps/desktop/out/`: `main/index.cjs`,
+`main/worker.cjs`, `preload/index.cjs` and `renderer/`.
+
+All of them are CommonJS. This is not a style choice: Electron's `electron`
+module provides no named ESM exports, so an ES-module main process fails at
+load, and a sandboxed preload cannot be an ES module at all. The workspace
+source stays ESM; only the emitted Electron entry points are CJS.
+
+Workspace packages are bundled into those artifacts rather than left as runtime
+imports, because they ship TypeScript source and Electron cannot load a `.ts`
+file. Third-party dependencies stay external.
+
+The development branch — the Vite dev server URL and its relaxed CSP — is
+removed at compile time by `import.meta.env.DEV`, not skipped at runtime. A
+runtime guard would leave both strings in the shipped binary, where the bundle
+grep that enforces locality cannot tell them from an accidental cloud
+fallback.
 
 ## Job and cancellation model
 

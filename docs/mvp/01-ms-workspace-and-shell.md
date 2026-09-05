@@ -57,7 +57,7 @@ re-proven.
    > extraction and database must never import from apps/desktop; that rule is
    > what keeps the evaluation harness runnable without Electron.
 
-## US-02 — Electron main, preload, renderer skeleton · `3d`
+## US-02 — Electron main, preload, renderer skeleton · `3d` · **✅ Done**
 
 **As a** developer, **I want** the three-process structure in place, **so that**
 privileged and unprivileged code are separated before either exists.
@@ -67,6 +67,12 @@ privileged and unprivileged code are separated before either exists.
 - Renderer is React via Vite, dev server loopback-only
 - `utilityProcess` pipeline worker can be spawned and killed, receives ids rather than handles, and holds no database connection
 - Application data resolves under Electron's `userData`; no hardcoded path
+
+**Status:** Done, 2026-09-05. Full story and its five implementation deviations
+in [01-us-workspace-and-shell.md](01-us-workspace-and-shell.md). Two are worth
+knowing before reading the code: the install-script allowlist this story
+specified turned out to be unnecessary and was not added, and the Electron main
+process is CommonJS because `electron` exposes no named ESM exports.
 
 **Branch:** `feat/us-02-electron-process-skeleton`
 
@@ -122,6 +128,8 @@ a later change is caught by a test rather than by a customer.
   neither
 - A check asserts `ignore-scripts=true` is still set and that
   `onlyBuiltDependencies` lists only packages that were reviewed
+- `ELECTRON_RUN_AS_NODE` is unset for every job that touches Electron, and a
+  check fails the build if it is set
 
 **Branch:** `ci/us-04-windows-and-macos`
 
@@ -145,3 +153,9 @@ a later change is caught by a test rather than by a customer.
 7. `ci: assert install scripts stay disabled` — *criterion 8*
    > `.npmrc` is a security control, not configuration. Nothing currently
    > fails if it is deleted.
+8. `ci: fail the build if ELECTRON_RUN_AS_NODE is set` — *criterion 9*
+   > Found during US-02. The variable makes the Electron binary behave as plain
+   > Node: `electron --version` reports a Node version and `require('electron')`
+   > returns a path string. Every Electron-dependent check then fails for a
+   > reason that has nothing to do with the code. Two US-02 failures were
+   > misdiagnosed as application bugs before this was found.

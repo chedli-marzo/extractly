@@ -36,11 +36,42 @@ const forbiddenInPackages = [
   },
 ];
 
+/**
+ * `apps/desktop` is the only package allowed to import Electron — but that
+ * exemption must not reach the renderer. The renderer has no Node, no
+ * filesystem and no network (docs/security.md); an import of `node:fs` there is
+ * the exact bug the process split exists to prevent, and it would otherwise be
+ * invisible to lint because it lives inside the one exempt package.
+ */
+const forbiddenInRenderer = [
+  {
+    group: ['electron', 'electron/*'],
+    message:
+      'The renderer reaches main through the preload bridge only. Add a named ' +
+      'channel to @app/shared instead.',
+  },
+  {
+    group: ['node:*', 'fs', 'path', 'child_process', 'os', 'crypto'],
+    message:
+      'The renderer has no Node. Anything needing the filesystem belongs in ' +
+      'the main process, behind a named IPC channel.',
+  },
+];
+
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    ignores: ['**/dist/**', '**/out/**', '**/node_modules/**'],
   },
   ...tseslint.configs.recommended,
+  {
+    files: ['apps/desktop/src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: forbiddenInRenderer },
+      ],
+    },
+  },
   {
     // Every file in a package, not only `src` — a test or a config file inside
     // a package would otherwise reach Electron unchecked. `tests/extraction`

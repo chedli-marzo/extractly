@@ -8,11 +8,13 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "lint": "eslint .",
+    "build": "pnpm --filter @app/desktop build",
+    "dev": "pnpm --filter @app/desktop dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc -b"
   },
   "devDependencies": {
     "@app/database": "workspace:*",

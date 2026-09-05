@@ -1,0 +1,297 @@
+# MS-01 — Approved user stories
+
+Full user stories for [MS-01](01-ms-workspace-and-shell.md), as approved at the
+end of Phase 2 and before any implementation. The milestone file carries the
+plan — criteria, commits, estimates. This file carries the reasoning that was
+agreed before code existed, so a later reader can tell what was decided from
+what was discovered.
+
+A story is added here only once it has been approved. It is not edited
+afterwards to match what shipped; that is what the milestone file's `Status`
+line and the review report are for.
+
+---
+
+# US-02 — Stand up the Electron main, preload, renderer and worker skeleton
+
+**Status:** Implemented. Deviations recorded at the end of this story.
+**Branch:** `feat/us-02-electron-process-skeleton`
+
+## User story
+
+**As a** developer, **I want** the three-process structure plus the pipeline
+worker in place, **so that** privileged and unprivileged code are separated
+before either exists.
+
+## Context
+
+[US-01](01-ms-workspace-and-shell.md) delivered a workspace that builds, tests
+and lints but runs nothing. This story makes it an application: a window, a
+bundled asset, one typed channel, a killable worker.
+
+The process model is already specified in [architecture.md](../architecture.md)
+"Process model" — main owns everything privileged, the renderer owns nothing,
+the worker does the slow work and holds ids rather than handles.
+[security.md](../security.md) fixes the hardening values and the CSP string.
+Neither is being decided here; both are being made real.
+
+The order matters: US-03 asserts the hardening in tests. That only works if this
+story exposes window options, CSP and path resolution as **pure values**, not as
+arguments inlined at a `new BrowserWindow(...)` call site. A skeleton that
+hardcodes them is a skeleton US-03 has to rewrite.
+
+Decisions taken in DISCUSS and locked here:
+
+| Decision | Choice |
+| -------- | ------ |
+| CSP in development | Relaxed, dev-only, HMR permitted. Production CSP is the [security.md](../security.md) string, unchanged, and is what US-03 tests |
+| Dev branch removal | Compile-time via `import.meta.env.DEV`, never a runtime `app.isPackaged` guard |
+| Electron install script | `onlyBuiltDependencies: ['electron']` in `pnpm-workspace.yaml` — one named package, explicitly |
+| Zod | Not in this story. Introduced when the first channel accepts arguments |
+| Worker location | `apps/desktop/src/worker/`, with the docs updated to match |
+| Renderer lint ban | In scope. `node:*` and `electron` banned under `src/renderer/**` |
+
+## Acceptance criteria
+
+1. `pnpm dev` opens a window. `pnpm build` produces a bundle and the packaged
+   main process loads the renderer from a bundled local asset over the app's own
+   scheme or `file://` — never over http.
+2. `pnpm install --frozen-lockfile` yields a working Electron binary.
+   `pnpm-workspace.yaml` contains `onlyBuiltDependencies: ['electron']` and
+   nothing else; `.npmrc` still sets `ignore-scripts=true`.
+3. `createWindowOptions()` is exported as a pure function returning exactly the
+   [security.md](../security.md) values: `contextIsolation`, `sandbox`,
+   `webSecurity` true; `nodeIntegration`, `nodeIntegrationInWorker`,
+   `nodeIntegrationInSubFrames`, `allowRunningInsecureContent`,
+   `experimentalFeatures` false. It is called with no arguments by main and is
+   unit-testable without launching Electron.
+4. `contentSecurityPolicy()` is exported as a pure function returning the
+   production CSP string from [security.md](../security.md), byte for byte. It
+   takes no mode parameter — the relaxed development policy is a separate export
+   reachable only under `import.meta.env.DEV`.
+5. A CSP header is set on every response via
+   `session.defaultSession.webRequest.onHeadersReceived`.
+6. The production bundle contains no development URL, no `ws://` literal, and no
+   relaxed CSP string. Verified by grepping the built main bundle — the same
+   grep US-03 formalises.
+7. Preload exposes a hand-written object of named channels over `contextBridge`.
+   Exactly one channel exists: `app:getVersion`, taking no arguments. No generic
+   `invoke(channel, args)` passthrough exists anywhere, and the channel name
+   union lives in `@app/shared`.
+8. The renderer is React rendered through Vite, calls `app:getVersion` through
+   the preload bridge, and displays the result. The dev server binds `127.0.0.1`
+   with `strictPort: true`.
+9. A `utilityProcess` worker at `apps/desktop/src/worker/` can be spawned and
+   killed by main. It receives `{ documentId, jobId }`, replies with a message
+   echoing the `jobId`, and terminates. It imports no database module and
+   receives no handle.
+10. `resolveAppPaths(userDataDir)` is a pure function mapping a `userData`
+    directory to `app.db`, `blobs/`, `renders/` and `tmp/`. Main calls it with
+    `app.getPath('userData')`. No path is hardcoded, and no directory is
+    created.
+11. A lint rule fails the build when a file under
+    `apps/desktop/src/renderer/**` imports `electron` or any `node:*` builtin.
+    Proven by making it fail once, then reverting.
+12. `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm test` all exit
+    0.
+
+## Technical considerations
+
+**Boundaries touched.** None of `DocumentParser`, `ExtractionProvider`,
+`OcrEngine`. This story creates no seam. The worker is a process boundary, not a
+fourth replaceable interface — it has one implementation and no alternative.
+
+**Why the dev branch must be compile-time.** US-03 criterion 6 greps the built
+bundle for non-loopback URL literals, and criterion 5 for network imports. A
+runtime `app.isPackaged` guard leaves the dev server URL and the relaxed CSP
+string in the shipped binary, where they are indistinguishable from an
+accidental cloud fallback. `import.meta.env.DEV` removes them from the artifact.
+This is the difference between a claim and a checkable one.
+
+**Preload is CommonJS.** A sandboxed preload cannot be an ES module even though
+the workspace is `"type": "module"`. electron-vite emits the correct format;
+this is a constraint to record, not to solve.
+
+**The one channel is deliberately trivial.** `app:getVersion` takes no
+arguments, so no validation is needed and Zod stays out. It exists to prove the
+shape of the contract — a named channel, a type in `@app/shared`, a hand-written
+bridge entry — not to be useful.
+
+**`packages/ui` stays empty.** The renderer shell is one component inside
+`apps/desktop`. Components move to `@app/ui` at MS-05, when there is a second
+consumer and a reason.
+
+**Dependencies needed, with reasons.** All dev-time except `electron` itself,
+which is the runtime.
+
+| Dependency | Reason |
+| ---------- | ------ |
+| `electron` | The runtime. [ADR-0001](../decisions/0001-electron.md). Pinned exact — the ABI matters for MS-02's native module. |
+| `electron-vite` | Builds main, preload and renderer with the correct formats and dev wiring. Accepted in the US-01 discussion; the alternative is three hand-maintained Vite configs. |
+| `vite` | Peer of electron-vite; the bundler ADR-0001 already chose. |
+| `react`, `react-dom` | ADR-0001. Criterion 8. |
+| `@vitejs/plugin-react` | React refresh and JSX transform for the renderer. |
+| `@types/react`, `@types/react-dom` | Types for the above. |
+
+No HTTP client, no state library, no UI kit, no logger, no auto-updater — the
+rejected-by-default list in [CLAUDE.md](../../CLAUDE.md) is unchanged by this
+story.
+
+**Data model, migrations, provenance, determinism-vs-AI:** untouched. No schema,
+no parser, no model.
+
+**Non-negotiables.** No egress path is created. The Vite dev server is a
+loopback listener that exists only in development and is absent from the
+production artifact by criterion 6. The crash reporter is not started and
+`crashDumps` is not relocated — US-03's criterion 7 formalises it; this story
+must simply not enable it.
+
+## Affected areas/files
+
+Created:
+
+```
+apps/desktop/electron.vite.config.ts
+apps/desktop/src/main/index.ts       app lifecycle, window, session, worker control
+apps/desktop/src/main/window.ts      createWindowOptions()
+apps/desktop/src/main/csp.ts         contentSecurityPolicy(), dev policy
+apps/desktop/src/main/paths.ts       resolveAppPaths()
+apps/desktop/src/main/ipc.ts         the app:getVersion handler
+apps/desktop/src/preload/index.ts    contextBridge, hand-written channel list
+apps/desktop/src/renderer/index.html
+apps/desktop/src/renderer/main.tsx
+apps/desktop/src/renderer/App.tsx
+apps/desktop/src/worker/index.ts     spawn target, echoes jobId
+packages/shared/src/ipc.ts           channel names and payload types
+apps/desktop/src/main/window.test.ts
+apps/desktop/src/main/csp.test.ts
+apps/desktop/src/main/paths.test.ts
+```
+
+Modified: root and package manifests for the new dependencies and scripts,
+`pnpm-workspace.yaml` for `onlyBuiltDependencies`, `eslint.config.js` for the
+renderer import ban, `packages/shared/src/index.ts` to re-export the IPC
+contract, `apps/desktop/tsconfig.json` for JSX and the DOM lib,
+[architecture.md](../architecture.md) and
+[apps/desktop/README.md](../../apps/desktop/README.md) for the worker path.
+
+## Out of scope
+
+- `electron-builder`, signing, notarisation, installers — MS-11. MS-01's goal
+  sentence mentions packaging, but no US-01–04 criterion does.
+- Hardening assertions as a suite: `will-navigate`, `setWindowOpenHandler`,
+  `setPermissionRequestHandler`, bundle greps as committed tests, crash reporter
+  checks — **US-03**. This story must not enable anything US-03 will have to
+  disable, but it does not write those tests.
+- CI, matrix, caching — **US-04**.
+- Zod and any channel taking arguments — MS-02.
+- SQLite, `better-sqlite3`, its `onlyBuiltDependencies` entry, and any directory
+  creation under `userData` — MS-02.
+- pdfjs, parsing, page rendering, real worker jobs — MS-04.
+- Any component in `packages/ui` — MS-05.
+- Window state persistence, application menus, tray, dark mode, routing.
+- An ADR. [ADR-0001](../decisions/0001-electron.md) already decided the stack;
+  nothing here is expensive to reverse.
+
+## Testing requirements
+
+Everything asserted in this story is tested **without launching Electron**,
+because everything asserted is a pure function. That is the point of extracting
+them.
+
+1. `window.test.ts` — `createWindowOptions()` returns each of the eight
+   [security.md](../security.md) values. Written as an exact object comparison,
+   not per-key assertions, so a *newly added* unsafe option fails the test rather
+   than passing unnoticed.
+2. `csp.test.ts` — `contentSecurityPolicy()` equals the
+   [security.md](../security.md) string byte for byte, and contains no `ws:`, no
+   `http:`, and no `unsafe-eval`. The test embeds the expected string as a
+   literal; it does not import the value it is checking.
+3. `paths.test.ts` — `resolveAppPaths('/tmp/x')` maps to the four documented
+   locations, and every returned path is inside the given directory after
+   normalisation. Includes a Windows-style input, since
+   [ADR-0002](../decisions/0002-windows-and-macos.md) makes Windows the primary
+   test platform.
+4. Criterion 11's lint ban is verified once by hand — add a `node:fs` import to
+   the renderer, watch `pnpm lint` fail, remove it. No deliberately-broken
+   fixture is committed.
+5. Criterion 6's bundle grep is run manually here and becomes a committed test
+   in US-03.
+
+No test asserts that a window opened, that Electron booted, or that the worker
+was scheduled — those need a real runtime and belong to manual verification,
+recorded in the PR.
+
+No fixtures. No PDFs. No model. Nothing here touches extraction, validation,
+grounding or the state machine, so none of those testing rules apply yet.
+
+
+## Deviations found during implementation
+
+The story is not edited to match what shipped. What follows is what implementing
+it revealed, in the order it was found.
+
+### 1. Criterion 2 was wrong, and was not implemented
+
+The story required `onlyBuiltDependencies: ['electron']`, on the premise that
+`ignore-scripts=true` would leave Electron without a binary. Measured, that
+premise is false:
+
+| Test | Result |
+| ---- | ------ |
+| `ignore-scripts=true`, clean install, then invoke electron | works — the binary downloads lazily on first invocation, `dist/version` reports `44.2.0` |
+| `onlyBuiltDependencies: ['electron']` | never fires; pnpm reports only esbuild as blocked |
+| `vite --version` with scripts disabled | `vite/7.3.6` — esbuild ships prebuilt platform packages |
+
+No install-script exception is needed, so none was added. Implementing the
+criterion as written would have loosened a security control to buy nothing.
+`pnpm-workspace.yaml` records the empty list and why, and names `better-sqlite3`
+at MS-02 as the expected first genuine entry.
+
+**Consequence for US-04:** the Electron binary arrives at first *launch*, not at
+install. A cold CI runner downloads it during the test step rather than the
+install step.
+
+### 2. Workspace packages had to be bundled, not externalised
+
+The first build left `import { IPC_CHANNELS } from "@app/shared"` in the output.
+Workspace packages ship TypeScript source by design
+([architecture.md](../architecture.md), "Repository layout"), and Electron cannot
+load a `.ts` file at runtime — so the packaged app would have failed to start.
+Fixed with `build.externalizeDeps: { exclude: ['@app/shared'] }`. Only `electron`
+and `node:path` remain external.
+
+### 3. Main and the worker are CommonJS, not ESM
+
+`import { app } from 'electron'` fails at load: the `electron` module provides no
+named ESM exports. Main and the worker now emit `.cjs` alongside the preload,
+which could never have been ESM anyway. Source stays ESM; `import.meta.dirname`
+was replaced with `dirname(fileURLToPath(import.meta.url))`, which survives the
+CommonJS output format.
+
+The story had recorded the preload's CJS constraint and missed the main
+process's. Recorded now in [architecture.md](../architecture.md), "Build output".
+
+### 4. `ELECTRON_RUN_AS_NODE` makes verification lie
+
+This environment sets `ELECTRON_RUN_AS_NODE=1`. It makes the Electron binary
+behave as plain Node: `electron --version` reports a Node version, and
+`require('electron')` returns the path to the binary as a string rather than the
+module. Two launch failures were diagnosed as application bugs before this was
+found; neither was.
+
+Verifying the app requires `env -u ELECTRON_RUN_AS_NODE`. **If the variable is
+set on a CI runner, every Electron-dependent check fails misleadingly** — carried
+to US-04 as an acceptance criterion.
+
+### 5. Two US-01 guards needed adjusting
+
+Neither was weakened; both were mis-scoped for a repository that now has runtime
+dependencies and build output.
+
+- `tests/workspace/dependency-graph.test.ts` asserted *every* declared
+  dependency, so adding `react` failed it. Narrowed to `@app/*` edges — the
+  layering it exists to protect. `@app/shared`'s zero-dependency rule is
+  unchanged and still absolute.
+- ESLint and Prettier were scanning `apps/desktop/out/`, producing 696 errors
+  from bundled third-party code. `out/` added to both ignore lists.
