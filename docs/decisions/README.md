@@ -25,3 +25,4 @@ wrong without context. Do not write one for routine implementation choices.
 | 0009 | Synthetic fixtures only           | Accepted |
 | 0010 | Licensing and paid distribution   | Proposed |
 | 0011 | Team collaboration and cloud structured data | Proposed |
+| 0012 | Parser engine selected by measurement | Proposed |
