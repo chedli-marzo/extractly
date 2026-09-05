@@ -32,6 +32,14 @@ way to be tested.
 - `packages/shared` has no runtime dependencies
 - Lockfile committed; install scripts disabled by default
 
+**Carried forward from implementation**
+
+- `typescript` is pinned to `6.0.3`, one major behind, because
+  `typescript-eslint@8` declares a peer range of `>=4.8.4 <6.1.0`. TypeScript 7
+  is the native compiler and unsupported by the lint toolchain today. Unpin when
+  `typescript-eslint` supports it; the pin is exact rather than ranged so the
+  upgrade is a deliberate act.
+
 **Branch:** `chore/us-01-workspace-scaffold`
 
 **Commits**
@@ -102,6 +110,12 @@ a later change is caught by a test rather than by a customer.
 - Native module rebuild per Electron version and architecture succeeds on both
 - Dependency audit runs; a network-capable transitive dependency in the main-process bundle fails the build
 - Build artifacts retained per run for inspection
+- The Node version in the matrix is pinned to one every dependency accepts, and
+  `engines.node` in the root manifest matches it
+- Build caching either caches `dist/` together with `*.tsbuildinfo` or caches
+  neither
+- A check asserts `ignore-scripts=true` is still set and that
+  `onlyBuiltDependencies` lists only packages that were reviewed
 
 **Branch:** `ci/us-04-windows-and-macos`
 
@@ -113,3 +127,15 @@ a later change is caught by a test rather than by a customer.
    > Every direct dependency runs with main-process privileges on a machine
    > holding confidential documents. This is a security control.
 4. `ci: retain build artifacts per run` — *criterion 5*
+5. `ci: pin the node version and align engines` — *criterion 6*
+   > `engines.node` is currently `>=24.0.0`, which permits Node 25 — a version
+   > Vitest 5 excludes (`^22.12 || ^24 || >=26`). Nothing enforces the field,
+   > so today it is decoration. CI is where it becomes real.
+6. `ci: cache dist and tsbuildinfo together` — *criterion 7*
+   > Found during the US-01 review: `tsc -b` fails with `TS6305` when
+   > `*.tsbuildinfo` survives but `dist/` does not, because the build believes
+   > declarations it cannot find are current. A cache that keeps one and drops
+   > the other reproduces exactly that state on a runner and nowhere else.
+7. `ci: assert install scripts stay disabled` — *criterion 8*
+   > `.npmrc` is a security control, not configuration. Nothing currently
+   > fails if it is deleted.

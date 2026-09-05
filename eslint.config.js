@@ -19,7 +19,7 @@ const forbiddenInPackages = [
   {
     group: ['electron', 'electron/*'],
     message:
-      'packages/* must never import Electron — that is what keeps the ' +
+      'This code must never import Electron — that is what keeps the ' +
       'evaluation harness runnable without a desktop runtime (ADR-0008). ' +
       'Electron belongs in apps/desktop.',
   },
@@ -42,7 +42,16 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended,
   {
-    files: ['packages/*/src/**/*.ts'],
+    // Every file in a package, not only `src` — a test or a config file inside
+    // a package would otherwise reach Electron unchecked. `tests/extraction`
+    // is held to the same rule for the reason it exists: the evaluation
+    // harness must run headlessly (ADR-0008), and it is the place most likely
+    // to be handed an Electron API by someone debugging a fixture.
+    //
+    // `tests/workspace` is deliberately not covered. It asserts the dependency
+    // graph, so importing every package by name — `@app/desktop` included — is
+    // its job.
+    files: ['packages/*/**/*.ts', 'tests/extraction/**/*.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

@@ -161,7 +161,9 @@ The three layers fail differently, which is why all three exist:
    all. Free, and structural rather than advisory.
 2. **ESLint `no-restricted-imports`** — catches an import statement for
    `electron`, for `@app/desktop`, or for a relative path escaping into
-   `apps/`.
+   `apps/`. Applied across all of `packages/*` and `tests/extraction`, not
+   only their `src` directories: a test file inside a package is exactly where
+   an Electron import gets added while debugging.
 3. **`tests/workspace/dependency-graph.test.ts`** — reads every manifest and
    asserts the edges above, catching a dependency declared but not yet
    imported, and `@app/shared` acquiring any runtime dependency at all.
