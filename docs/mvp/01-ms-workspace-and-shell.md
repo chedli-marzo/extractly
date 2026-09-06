@@ -11,6 +11,38 @@ by intention.
 Nothing in this milestone does anything a user would recognise. Its value is
 that every later milestone lands on a floor that already holds.
 
+## What this milestone delivers, for a non-technical reader
+
+**Milestone 1 has no feature.** That is the headline, and it should be said
+first, or four weeks look like nothing happened.
+
+What it delivers:
+
+> An application that opens on Windows and Mac and does nothing yet — plus
+> automated proof that it *cannot* send a document anywhere.
+
+Why that is worth the time:
+
+- The privacy promise is checked by machine, not promised in a meeting. If
+  someone later adds code that could upload a document, the build stops.
+- Both platforms are tested from the start, so "works on Mac, breaks in the
+  plant" is caught here rather than at a customer site.
+- Everything after this ships onto a floor that already holds.
+
+What it is not: no PDF import, no extraction, no AI, nothing to demo.
+
+The first milestone worth showing a stakeholder is
+[MS-05](05-ms-import-and-viewer.md) — a real PDF opened, its text searchable,
+every value clickable back to its exact spot on the page. This milestone is what
+makes that demo trustworthy rather than a prototype.
+
+**Caveat when presenting:** the security checks pass locally, but no CI service
+is connected yet. "Checked on every change" is true of the checks and not yet of
+the automation.
+
+Manual verification steps are in
+[01-qa-workspace-and-shell.md](01-qa-workspace-and-shell.md).
+
 ## Exit criteria
 
 - `pnpm install --frozen-lockfile`, typecheck, lint and test all pass on Windows and macOS in CI
