@@ -1,16 +1,43 @@
+import { basename, dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { resolveAppPaths } from './paths.js';
 
+/**
+ * The layout from docs/architecture.md, "Storage on disk", as names rather than
+ * as whole paths.
+ *
+ * Asserting full path strings would hardcode a separator, and `node:path`
+ * correctly produces `\` on Windows and `/` elsewhere — so such a test fails on
+ * the primary test platform (ADR-0002) while the code is right. Asserting the
+ * name and the parent directory pins the same decision without pinning the
+ * platform.
+ */
+const EXPECTED_LAYOUT = {
+  database: 'app.db',
+  blobs: 'blobs',
+  renders: 'renders',
+  tmp: 'tmp',
+  crashDumps: 'crash-dumps',
+} as const;
+
 describe('resolveAppPaths', () => {
-  it('maps a userData directory to the layout in docs/architecture.md', () => {
-    expect(resolveAppPaths('/home/u/.config/app')).toStrictEqual({
-      database: '/home/u/.config/app/app.db',
-      blobs: '/home/u/.config/app/blobs',
-      renders: '/home/u/.config/app/renders',
-      tmp: '/home/u/.config/app/tmp',
-      crashDumps: '/home/u/.config/app/crash-dumps',
-    });
+  const root = join('home', 'u', '.config', 'app');
+
+  it('resolves exactly the entries the layout defines', () => {
+    expect(Object.keys(resolveAppPaths(root)).sort()).toStrictEqual(
+      Object.keys(EXPECTED_LAYOUT).sort(),
+    );
   });
+
+  it.each(Object.entries(EXPECTED_LAYOUT))(
+    'places %s directly under userData as "%s"',
+    (key, name) => {
+      const resolved =
+        resolveAppPaths(root)[key as keyof typeof EXPECTED_LAYOUT];
+      expect(basename(resolved)).toBe(name);
+      expect(dirname(resolved)).toBe(root);
+    },
+  );
 
   /**
    * Windows is the primary test platform (ADR-0002). Separator normalisation is
