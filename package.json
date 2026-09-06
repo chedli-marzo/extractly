@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "pnpm --filter @app/desktop build",
+    "check": "node scripts/ci.mjs",
     "dev": "pnpm --filter @app/desktop dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

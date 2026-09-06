@@ -120,6 +120,25 @@ It answers one question:
 `ExtractionProvider` interface is written; no implementation is. AI is not
 postponed — its seam is defined now so it cannot grow into the parser later.
 
+## Running the checks
+
+```
+pnpm check
+```
+
+Runs the exact CI sequence: install → typecheck → lint → format:check → build →
+test. The order matters — `tests/security` reads `apps/desktop/out/` and fails
+when it is absent, so `build` precedes `test`.
+
+It refuses to start when `ELECTRON_RUN_AS_NODE` is set. That variable makes the
+Electron binary behave as plain Node, and every Electron-dependent check then
+fails for a reason unrelated to the code. Use
+`env -u ELECTRON_RUN_AS_NODE pnpm check`.
+
+`.github/workflows/ci.yml` runs the same script on Windows and macOS. There is
+no git remote yet, so it has never executed — see
+[.github/README.md](.github/README.md).
+
 ## Stack
 
 Decided in [docs/decisions/](docs/decisions/). Nothing installed yet.

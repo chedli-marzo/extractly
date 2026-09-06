@@ -456,3 +456,107 @@ Main never spawns it. MS-04 is where it earns a caller.
   `default-src 'none'` and `sandbox: true`; it stops being low the moment
   anything loads remote-shaped content.
 - The tests assert every decision and no registration.
+
+
+---
+
+# US-04 — Run the full check sequence on Windows and macOS, and prove it locally first
+
+**Status:** Implemented, pending Phase 4 review.
+**Branch:** `ci/us-04-windows-and-macos`
+
+## User story
+
+**As a** developer, **I want** both platforms built and tested on every change,
+**so that** cross-platform assumptions fail in CI rather than at a customer site.
+
+## Context
+
+MS-01's first three stories built a floor and left it unenforced. A guard nobody
+runs is a comment.
+
+This story carries an unusual constraint: **there is no git remote**, so no
+workflow can execute. Writing YAML that has never run and calling it done would
+make every criterion an unverifiable claim — the exact failure the previous
+stories were written against. So it delivers two things, and the local runner
+carries the proof:
+
+```
+scripts/ci.mjs           the sequence, executable here, exit code is the verdict
+.github/workflows/ci.yml a thin translation onto two runners
+```
+
+Step order is load-bearing. `tests/security` reads `apps/desktop/out/` and fails
+when it is absent, so `build` must precede `test`.
+
+Decisions taken in DISCUSS and locked here:
+
+| Decision | Choice |
+| -------- | ------ |
+| No remote | Write the workflow *and* the local runner. Prove the sequence now |
+| Provider | GitHub Actions |
+| Matrix | `windows-latest` (x64), `macos-latest` (arm64). Intel macOS out of scope |
+| Native module rebuild | Deferred to MS-02, where `better-sqlite3` first exists |
+| Dependency audit | The US-03 bundle test suffices. No tree audit |
+| Format check | Hard failure |
+| App launch | Not in CI |
+| Uploads | Build artifacts only |
+
+## Acceptance criteria
+
+1. `scripts/ci.mjs` runs install → typecheck → lint → format:check → build →
+   test, stopping at the first failure with a non-zero exit.
+2. It refuses to start when `ELECTRON_RUN_AS_NODE` is set, naming the variable
+   and what it breaks. It does not silently unset it.
+3. It prints resolved Node and pnpm versions and fails when either falls outside
+   `engines` and `packageManager`.
+4. It exits 0 on this machine, with output recorded in the PR.
+5. Deleting `apps/desktop/out/` still exits 0; swapping `build` and `test` makes
+   it fail.
+6. `.github/workflows/ci.yml` runs the same six steps on both runners.
+7. Node and pnpm are pinned, not floating.
+8. Any cache keys `dist/` and `*.tsbuildinfo` together, or caches neither.
+9. The Electron binary is cached by version — it downloads at first launch.
+10. A step asserts `ignore-scripts=true` and that `onlyBuiltDependencies` holds
+    nothing unreviewed. It fails, not warns.
+11. `apps/desktop/out/` is the only upload.
+12. The workflow does not launch the application.
+13. All existing checks still pass.
+
+## Technical considerations
+
+**Why a script rather than duplicating steps in YAML.** Two copies of a sequence
+drift, and the order is the load-bearing part. The workflow calls `pnpm check`,
+so the order exists once and is executable on a developer machine — which is the
+only reason this story is worth doing before a remote exists.
+
+**Why `.mjs` and not shell.** Windows is the primary test platform (ADR-0002). A
+`.sh` runner would not run there.
+
+**Why the runner refuses rather than unsets `ELECTRON_RUN_AS_NODE`.** Unsetting
+it would make the run pass while leaving the developer's shell still lying about
+Electron for every command typed afterwards.
+
+**The cache criterion is a bug that already happened.** `tsc -b` reports TS6305
+when build info survives without its declarations — unreachable locally,
+trivially reachable through a partial cache restore.
+
+**Dependencies.** None.
+
+## Out of scope
+
+Adding a remote, pushing, opening a PR; observing the workflow pass; native
+module rebuild (MS-02); a dependency-tree audit; Linux; Intel macOS; signing and
+installers (MS-11); coverage; launching the app; an ADR.
+
+## Testing requirements
+
+The deliverable is a harness, so verification is behavioural.
+
+1. `scripts/ci.mjs` exits 0 here, output in the PR.
+2. Order proven by deleting `out/`, then by swapping `build` and `test`.
+3. The `ELECTRON_RUN_AS_NODE` guard proven by running with it set.
+4. The `ignore-scripts` assertion proven by removing the line.
+5. The version guard proven by an impossible `engines.node`.
+6. No new unit tests. A test asserting "the script calls six commands" restates
+   the implementation.
