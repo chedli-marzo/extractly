@@ -34,5 +34,16 @@ treats any present value as a specified version, and then conflicts with
 The Windows Electron cache path was also switched from backslashes to forward
 slashes, which `actions/cache` handles on every platform.
 
-Neither was reachable locally. What was proven locally — the six steps and their
-order — needed no change.
+The second run got further and failed on Windows only: `execFileSync('pnpm', …)`
+died with `ENOENT`. On Windows `pnpm` is `pnpm.cmd`, and Node refuses to spawn a
+`.cmd` without a shell — a deliberate restriction since the batch-file
+argument-injection fix (CVE-2024-27980). On macOS `pnpm` is an ordinary
+executable, so the same line worked. The runner now passes `shell: true` on
+Windows; every argument the script spawns is a literal, so shell interpretation
+adds no injection surface.
+
+That one is the reason ADR-0002 makes Windows the primary test platform. It is
+invisible on macOS and fails every step on Windows.
+
+None of these were reachable locally. What was proven locally — the six steps
+and their order — needed no change.

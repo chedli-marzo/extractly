@@ -14,6 +14,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+
+/**
+ * On Windows `pnpm` is `pnpm.cmd`, and Node refuses to spawn a `.cmd` without a
+ * shell — a deliberate restriction since the batch-file argument-injection fix
+ * (CVE-2024-27980). Without this, every `execFileSync('pnpm', …)` here dies
+ * with `ENOENT` on a Windows runner while working perfectly on macOS, where
+ * `pnpm` is an ordinary executable.
+ *
+ * Every argument this script passes is a literal defined below — none comes
+ * from the environment or from a file — so shell interpretation adds no
+ * injection surface.
+ */
+const useShell = process.platform === 'win32';
 const manifest = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 );
@@ -77,7 +90,10 @@ function versionAtLeast(actual, minimum) {
 
 function checkToolVersions() {
   const node = process.versions.node;
-  const pnpm = execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim();
+  const pnpm = execFileSync('pnpm', ['--version'], {
+    encoding: 'utf8',
+    shell: useShell,
+  }).trim();
 
   const required = manifest.engines?.node ?? '';
   const minimum = /^>=\s*(\d+\.\d+\.\d+)$/.exec(required)?.[1];
@@ -144,7 +160,11 @@ function checkInstallScriptsDisabled() {
 function run(name, args) {
   console.log(`\n▸ ${name}`);
   try {
-    execFileSync('pnpm', args, { cwd: repoRoot, stdio: 'inherit' });
+    execFileSync('pnpm', args, {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      shell: useShell,
+    });
   } catch {
     fail(`${name} failed.`);
   }
