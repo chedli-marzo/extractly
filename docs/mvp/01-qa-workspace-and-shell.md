@@ -15,7 +15,7 @@ dev server:
 | **Local dev** | `pnpm dev`, hot reload, Vite dev server on loopback | yes |
 | **Local production build** | `pnpm build`, then launching the built output — no dev server involved | yes |
 | **Signed installer on a clean machine** | the real pre-release check | **no** — packaging is [MS-11](11-ms-packaging-and-distribution.md) |
-| **CI artifacts per commit** | build output downloaded from a workflow run | **no** — no git remote is configured, so the workflow has never run |
+| **CI artifacts per commit** | build output downloaded from a workflow run | **partly** — the workflow runs on GitHub Actions; it is not green yet |
 
 So today the meaningful QA pass is: **local production build, on both Windows
 and macOS, on someone else's machine as well as the author's.**

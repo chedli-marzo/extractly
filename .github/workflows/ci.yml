@@ -35,11 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version` input, deliberately. The action reads `packageManager`
+      # from package.json when the input is absent, so the pinned version has
+      # exactly one home and cannot drift from what scripts/ci.mjs enforces.
+      # Passing `version: false` does not mean "unset" — the action reads it as
+      # a specified version and fails with "Multiple versions of pnpm
+      # specified".
       - uses: pnpm/action-setup@v4
         with:
-          # Read from `packageManager` in package.json, so this cannot drift
-          # from what scripts/ci.mjs enforces.
-          version: false
           run_install: false
 
       - uses: actions/setup-node@v4
@@ -56,7 +59,7 @@ jobs:
           path: |
             ~/.cache/electron
             ~/Library/Caches/electron
-            ~\AppData\Local\electron\Cache
+            ~/AppData/Local/electron/Cache
           key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       # `dist/` and `*.tsbuildinfo` are cached together or not at all. `tsc -b`

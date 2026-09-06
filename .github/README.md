@@ -10,10 +10,9 @@ That split is deliberate. The order of the steps is load-bearing —
 an order that exists in two places drifts. Keeping it in a script also means it
 can be run, and was run, on a developer machine.
 
-That mattered here more than usual: **this repository has no git remote, so the
-workflow has never executed.** It was written after the sequence was proven
-locally, rather than debugged through a series of red commits once a remote
-appears.
+That mattered here more than usual: the workflow was written before a remote
+existed, so it was proven locally first rather than debugged through a series of
+red commits.
 
 ## What it does not do
 
@@ -22,8 +21,18 @@ appears.
 - It uploads `apps/desktop/out/` and nothing else. No test reporter, no coverage
   service, no action that transmits source or results anywhere.
 
-## When a remote exists
+## First real run
 
-Expect the first runs to need adjustment — cache paths and the pnpm setup action
-are the likely candidates. What should not need adjustment is the sequence
-itself.
+The prediction held: the sequence was fine, the wiring around it was not.
+
+The first run failed on both runners at `pnpm/action-setup` with *"Multiple
+versions of pnpm specified"*. The cause was `version: false`, written to mean
+"take it from `packageManager`". The action does not read it that way — it
+treats any present value as a specified version, and then conflicts with
+`packageManager`. The fix is to omit the input entirely.
+
+The Windows Electron cache path was also switched from backslashes to forward
+slashes, which `actions/cache` handles on every platform.
+
+Neither was reachable locally. What was proven locally — the six steps and their
+order — needed no change.

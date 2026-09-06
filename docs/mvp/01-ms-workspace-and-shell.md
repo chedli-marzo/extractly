@@ -36,9 +36,9 @@ The first milestone worth showing a stakeholder is
 every value clickable back to its exact spot on the page. This milestone is what
 makes that demo trustworthy rather than a prototype.
 
-**Caveat when presenting:** the security checks pass locally, but no CI service
-is connected yet. "Checked on every change" is true of the checks and not yet of
-the automation.
+**Caveat when presenting:** the security checks pass locally and the automation
+that runs them on every change is connected but not yet green. "Checked on every
+change" is true of the checks, and becoming true of the automation.
 
 Manual verification steps are in
 [01-qa-workspace-and-shell.md](01-qa-workspace-and-shell.md).
