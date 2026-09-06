@@ -86,7 +86,7 @@ process is CommonJS because `electron` exposes no named ESM exports.
 4. `feat: spawn and kill the pipeline utilityProcess` — *criterion 4*
 5. `chore: resolve app data under userData` — *criterion 5*
 
-## US-03 — Hardening asserted in tests · `2d`
+## US-03 — Hardening asserted in tests · `2d` · **✅ Done**
 
 **As a** maintainer, **I want** the security posture verified by CI, **so that**
 a later change is caught by a test rather than by a customer.
@@ -98,6 +98,17 @@ a later change is caught by a test rather than by a customer.
 - Test greps the built main-process bundle for `fetch`, `node:http`, `node:https` — none permitted
 - Test greps the built bundle for non-loopback URL literals — none permitted
 - Electron crash reporter not started; `crashDumps` path kept local
+
+**Status:** Done, 2026-09-06. Review found four defects, all fixed: the bundle
+scan's IPv6 loopback entry could never match, `setPermissionCheckHandler` was
+unset so synchronous permission queries answered with Chromium's defaults, a
+function name described half of what it did, and a comment had been mangled by
+an earlier rename. Every guard was verified by making it fail on purpose. Story
+and findings in [01-us-workspace-and-shell.md](01-us-workspace-and-shell.md).
+
+Carried forward: the greps assume unminified output and weaken when MS-11
+enables minification; `will-redirect` and `will-frame-navigate` are unhandled;
+the tests assert the decisions, never the wiring.
 
 **Branch:** `test/us-03-hardening-assertions`
 

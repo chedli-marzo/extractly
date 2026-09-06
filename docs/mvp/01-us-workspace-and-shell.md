@@ -301,7 +301,7 @@ dependencies and build output.
 
 # US-03 — Assert the Electron hardening in CI, and build the three protections it is missing
 
-**Status:** Implemented, pending Phase 4 review.
+**Status:** Done, reviewed 2026-09-06. Review findings at the end of this story.
 **Branch:** `test/us-03-hardening-assertions`
 
 ## User story
@@ -413,3 +413,46 @@ All in Vitest, no Electron.
    literals, and `crashReporter.start`.
 6. Each guard verified by making it fail on purpose, then reverting. Nothing
    deliberately broken is committed.
+
+
+## Review findings — US-03
+
+Four defects, all fixed in the review pass.
+
+**1. The IPv6 loopback allowlist entry could never match.** The bundle scan split
+each URL on `[/:?#]`, so `http://[::1]:8080/` yielded a host of `[`. The `[::1]`
+entry was dead configuration, and a legitimate IPv6 loopback URL would have been
+reported as a violation — precisely the false positive that gets a security test
+deleted the first time it is inconvenient. Now parsed with `new URL()`; a
+literal that does not parse is treated as a violation rather than as safe.
+
+**2. Permission checks bypassed the handler.** Only `setPermissionRequestHandler`
+was wired. Synchronous queries — `navigator.permissions.query` among them — go
+through `setPermissionCheckHandler`, which was unset and therefore answering
+with Chromium's defaults. Both now share `permissionDecision`. Beyond the
+literal criterion, and exactly the gap the criterion existed to close.
+
+**3. `applyContentSecurityPolicy()` also registered the permission handler.** A
+function whose name describes half of what it does is how the other half gets
+removed by someone tidying up. Renamed `hardenSession()`.
+
+**4. A comment had been mangled by an earlier mechanical rename**, reading
+"resolved from `import.meta.url` rather than `here`". Restored.
+
+### Correction to US-02
+
+US-02 criterion 9 was reported as passing. It is **partial**: the worker exists,
+builds, and receives ids rather than handles, but `spawnPipelineWorker`,
+`sendJob`, `onWorkerAck` and `killPipelineWorker` have no callers and no test.
+Main never spawns it. MS-04 is where it earns a caller.
+
+### Risks carried forward
+
+- The bundle greps assume unminified output. MS-11 enabling minification
+  weakens them silently — that needs to be a criterion there, not a surprise.
+- URLs built by concatenation are invisible to a literal scan. The import ban is
+  the mitigation: it catches the transport rather than the address.
+- `will-redirect` and `will-frame-navigate` are unhandled. Low exposure under
+  `default-src 'none'` and `sandbox: true`; it stops being low the moment
+  anything loads remote-shaped content.
+- The tests assert every decision and no registration.
