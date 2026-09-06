@@ -9,7 +9,7 @@ import { permissionDecision } from './permissions.js';
 import { resolveAppPaths } from './paths.js';
 import { createWindowOptions } from './window.js';
 
-// Resolved from `import.meta.url` rather than `here` so it
+// Resolved from `import.meta.url` rather than `import.meta.dirname` so it
 // survives the CommonJS output format the Electron main process requires.
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -24,7 +24,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 // the milestone that writes to a directory creates it.
 const appPaths = resolveAppPaths(app.getPath('userData'));
 
-function applyContentSecurityPolicy(): void {
+/**
+ * Everything that hardens the shared session: the CSP on every response, and
+ * permission handling. Registered once, before the first window exists.
+ */
+function hardenSession(): void {
   const policy = import.meta.env.DEV
     ? developmentContentSecurityPolicy(
         process.env['ELECTRON_RENDERER_URL'] ?? '',
@@ -41,6 +45,14 @@ function applyContentSecurityPolicy(): void {
     (_webContents, permission, callback) => {
       callback(permissionDecision(permission));
     },
+  );
+
+  // Both handlers are needed. The request handler covers permissions the page
+  // asks for; the check handler covers the synchronous queries a page can make
+  // without ever prompting — `navigator.permissions.query` among them. Wiring
+  // only the first leaves the second answering with Chromium's defaults.
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
+    permissionDecision(permission),
   );
 }
 
@@ -100,7 +112,7 @@ function createWindow(): BrowserWindow {
 app.setPath('crashDumps', appPaths.crashDumps);
 
 void app.whenReady().then(() => {
-  applyContentSecurityPolicy();
+  hardenSession();
   registerIpcHandlers();
   createWindow();
 

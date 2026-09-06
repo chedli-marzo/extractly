@@ -21,6 +21,7 @@ const bundlePath = fileURLToPath(
  * incidentally: MS-08's inference adapter talks to a local model runtime and
  * must pass this test on purpose.
  */
+// Brackets included: `new URL('http://[::1]/').hostname` keeps them.
 const ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
 
 /**
@@ -64,16 +65,24 @@ describe('the built main-process bundle', () => {
   });
 
   it('names no host outside the loopback allowlist', () => {
-    const urls =
-      readBundle().match(/\bwss?:\/\/[^\s'"`)]+|\bhttps?:\/\/[^\s'"`)]+/g) ??
-      [];
+    const urls = readBundle().match(/\b(?:wss?|https?):\/\/[^\s'"`)]+/g) ?? [];
+
     const forbidden = urls.filter((url) => {
-      const host = url.replace(/^[a-z]+:\/\//, '').split(/[/:?#]/)[0] ?? '';
-      return (
-        !ALLOWED_HOSTS.includes(host) && !ALLOWED_HOSTS.includes(`[${host}]`)
-      );
+      // Parsed rather than split on punctuation. Hand-splitting cannot read an
+      // IPv6 host: `http://[::1]:8080/` splits at the first colon and yields
+      // `[`, so the allowlist entry for the IPv6 loopback would silently never
+      // apply and a legitimate loopback URL would be reported as a violation.
+      let host: string;
+      try {
+        host = new URL(url).hostname;
+      } catch {
+        // A literal that does not parse as a URL is not evidence of safety.
+        return true;
+      }
+      return !ALLOWED_HOSTS.includes(host);
     });
-    expect(forbidden, `non-loopback URLs in the shipped bundle`).toStrictEqual(
+
+    expect(forbidden, 'non-loopback URLs in the shipped bundle').toStrictEqual(
       [],
     );
   });
