@@ -40,6 +40,14 @@ start and `electron --version` reports a Node version. Two failures during
 development were misdiagnosed as application bugs because of it. Unset it, or
 prefix every command with `env -u ELECTRON_RUN_AS_NODE`.
 
+On Windows, if a clone predates `.gitattributes`, Git may have checked files out
+with CRLF line endings and `pnpm check` will report every file as badly
+formatted. Refresh the working tree once:
+
+```sh
+git rm --cached -r . && git reset --hard
+```
+
 ```sh
 pnpm install --frozen-lockfile
 ```

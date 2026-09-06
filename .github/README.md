@@ -45,5 +45,22 @@ adds no injection surface.
 That one is the reason ADR-0002 makes Windows the primary test platform. It is
 invisible on macOS and fails every step on Windows.
 
+The third run failed on Windows only again, this time at `format:check`, on
+**every file in the repository**. Git converts text files to CRLF when checking
+out on Windows; Prettier enforces LF. A `.gitattributes` with `* text=auto
+eol=lf` fixes it at the source, for every tool rather than just Prettier — ESLint
+and any byte-comparing test would have hit the same wall. It also marks binary
+types, which matters before MS-03 commits fixture PDFs: a line-ending-converted
+PDF is a corrupt PDF, and it corrupts silently.
+
 None of these were reachable locally. What was proven locally — the six steps
-and their order — needed no change.
+and their order — needed no change in any of the three.
+
+## If you already have a Windows clone
+
+`.gitattributes` applies at checkout. An existing Windows working tree will show
+every file as modified until it is refreshed:
+
+```sh
+git rm --cached -r . && git reset --hard
+```
