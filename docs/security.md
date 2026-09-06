@@ -123,7 +123,9 @@ Additionally:
   browser only after an explicit user action, and only for `https:` URLs the
   app itself constructed — never a URL taken from a document.
 - **Permissions denied by default.** `setPermissionRequestHandler` returns
-  false for camera, microphone, geolocation, notifications, and clipboard read.
+  false for every permission — written as a default-deny rather than a list, so
+  a permission introduced by a future Chromium is refused because it was never
+  allowed, not because someone remembered to add it.
 - **Preload is the entire API surface.** A hand-written, typed list of named
   channels. No generic `invoke(channel, args)` passthrough — that would hand
   the renderer the main process.
@@ -213,15 +215,34 @@ privileges on a machine holding confidential engineering documents.
 
 ## Verification
 
-These are testable claims, and the tests are part of the deliverable:
+These are testable claims, and the tests are part of the deliverable. Four of
+them exist now:
 
-1. Grep the production bundle for non-loopback URL literals — none.
-2. Assert the Ollama adapter rejects a non-loopback host.
-3. Run the app with an offline network namespace / firewall deny-all except
-   loopback; full import → approve → export must succeed.
-4. Assert `BrowserWindow` options and CSP in a test, so a later change is caught
-   by CI rather than by a customer.
-5. Assert every IPC handler rejects malformed input.
+| Claim | Enforced by | State |
+| ----- | ----------- | ----- |
+| No non-loopback URL literal in the production bundle | `tests/security/bundle.test.ts` | **enforced** |
+| No network module imported, no `fetch` call | `tests/security/bundle.test.ts` | **enforced** |
+| Crash reporter never started | `tests/security/bundle.test.ts` | **enforced** |
+| `BrowserWindow` options and the CSP | `apps/desktop/src/main/*.test.ts` | **enforced** |
+| Navigation locked, window-open denied, permissions denied | `navigation.test.ts`, `permissions.test.ts` | **enforced** |
+| The Ollama adapter rejects a non-loopback host | — | pending MS-08 |
+| Offline run: import → approve → export succeeds behind a deny-all firewall | — | pending MS-10 |
+| Every IPC handler rejects malformed input | — | pending MS-02, with the first handler that takes arguments |
+
+The bundle tests read `apps/desktop/out/`, so a build must have run. When the
+bundle is missing they fail with a message saying so rather than skipping — a
+skipped security test is indistinguishable from a passing one in a CI summary.
+
+They cover the main-process bundle only. The renderer bundle carries React,
+which embeds `https://react.dev` in error messages, so scanning it needs a
+curated allowlist and its own story.
+
+**What these tests do not prove.** They assert the *decisions* — that navigation
+outside the app is refused, that every permission is denied — because those are
+pure functions. They cannot assert the *wiring*, that
+`setPermissionRequestHandler` was actually handed that function. That is one
+line per handler in `apps/desktop/src/main/index.ts`, and it is reviewed by eye.
+Recording the gap is more useful than a mock that would only ever test itself.
 
 ## Distribution
 

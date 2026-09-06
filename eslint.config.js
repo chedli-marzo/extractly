@@ -64,6 +64,17 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended,
   {
+    // A leading underscore marks a parameter that exists to document a
+    // signature rather than to be used — `permissionDecision(_permission)`
+    // takes the permission precisely to show it is ignored by design.
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
     files: ['apps/desktop/src/renderer/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

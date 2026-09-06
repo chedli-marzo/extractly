@@ -13,6 +13,9 @@ export default defineConfig({
       { test: { name: 'desktop', root: 'apps/desktop' } },
       { test: { name: 'evaluation', root: 'tests/extraction' } },
       { test: { name: 'workspace', root: 'tests/workspace' } },
+      // Reads `apps/desktop/out/`, so it needs `pnpm build` to have run. It
+      // fails rather than skips when the bundle is missing.
+      { test: { name: 'security', root: 'tests/security' } },
     ],
   },
 });

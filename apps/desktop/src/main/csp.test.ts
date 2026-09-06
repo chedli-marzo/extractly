@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contentSecurityPolicy } from './csp.js';
+import { applyCspHeaders, contentSecurityPolicy } from './csp.js';
 
 describe('contentSecurityPolicy', () => {
   /**
@@ -20,4 +20,43 @@ describe('contentSecurityPolicy', () => {
       expect(contentSecurityPolicy()).not.toContain(forbidden);
     },
   );
+});
+
+describe('applyCspHeaders', () => {
+  const policy = contentSecurityPolicy();
+
+  it('adds the policy to headers that have none', () => {
+    expect(applyCspHeaders({ 'X-Thing': ['1'] }, policy)).toStrictEqual({
+      'X-Thing': ['1'],
+      'Content-Security-Policy': [policy],
+    });
+  });
+
+  it('handles a response with no headers at all', () => {
+    expect(applyCspHeaders(undefined, policy)).toStrictEqual({
+      'Content-Security-Policy': [policy],
+    });
+  });
+
+  /**
+   * Replaced, never appended. Two CSP headers are enforced as an intersection,
+   * so an upstream one can only break the page in a way that invites someone to
+   * relax our policy instead of removing theirs.
+   */
+  it('replaces an existing policy rather than appending to it', () => {
+    const result = applyCspHeaders(
+      { 'Content-Security-Policy': ['default-src *'] },
+      policy,
+    );
+    expect(result['Content-Security-Policy']).toStrictEqual([policy]);
+  });
+
+  it('replaces a differently-cased existing policy exactly once', () => {
+    const result = applyCspHeaders(
+      { 'content-security-policy': ['default-src *'] },
+      policy,
+    );
+    expect(Object.keys(result)).toStrictEqual(['Content-Security-Policy']);
+    expect(result['Content-Security-Policy']).toStrictEqual([policy]);
+  });
 });

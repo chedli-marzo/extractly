@@ -8,6 +8,7 @@ describe('resolveAppPaths', () => {
       blobs: '/home/u/.config/app/blobs',
       renders: '/home/u/.config/app/renders',
       tmp: '/home/u/.config/app/tmp',
+      crashDumps: '/home/u/.config/app/crash-dumps',
     });
   });
 

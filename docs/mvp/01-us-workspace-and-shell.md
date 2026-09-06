@@ -295,3 +295,121 @@ dependencies and build output.
   unchanged and still absolute.
 - ESLint and Prettier were scanning `apps/desktop/out/`, producing 696 errors
   from bundled third-party code. `out/` added to both ignore lists.
+
+
+---
+
+# US-03 — Assert the Electron hardening in CI, and build the three protections it is missing
+
+**Status:** Implemented, pending Phase 4 review.
+**Branch:** `test/us-03-hardening-assertions`
+
+## User story
+
+**As a** maintainer, **I want** the security posture verified by CI, **so that**
+a later change is caught by a test rather than by a customer.
+
+## Context
+
+US-02 built the process split and made three things testable by keeping them
+pure — window options, the CSP string, path resolution. What it did not build is
+everything that happens *after* a window exists: a link the user clicks, a
+`window.open` from a page, a permission prompt, a crash.
+
+So this story is half implementation. The commit plan in
+[01-ms-workspace-and-shell.md](01-ms-workspace-and-shell.md) already says so —
+commits 3, 4 and 6 are `feat:` and `chore:`.
+
+The threat model in [security.md](../security.md) is accidental egress, not a
+targeted attacker: a dependency that phones home, a crash reporter that attaches
+a page image, a cloud fallback added under deadline. A convention catches none
+of those. A grep over the shipped bundle does.
+
+Decisions taken in DISCUSS and locked here:
+
+| Decision | Choice |
+| -------- | ------ |
+| Missing `out/` | Test fails with an explicit "run `pnpm build` first". Never skips — a skipped security test reads as a passing one |
+| Test location | `tests/security/`, its own repo-level Vitest project |
+| URL allowlist | `127.0.0.1`, `localhost`, `[::1]`. Main bundle only — the renderer stays out of scope |
+| Criterion 7 | Split: grep for `crashReporter.start`, and add `crashDumps` to `resolveAppPaths` |
+| Scope | Implements navigation blocking, window-open denial, permission denial and crash-dump containment, then tests them |
+
+## Acceptance criteria
+
+1. `shouldAllowNavigation(allowedPrefix, targetUrl)` is pure and returns `false`
+   for any URL outside the application's own origin, including `https:`,
+   `file:` paths outside the app, and `javascript:`. Main wires it to
+   `will-navigate`.
+2. `setWindowOpenHandler` returns `{ action: 'deny' }` for every URL without
+   exception.
+3. `permissionDecision(permission)` is pure and returns `false` for every
+   permission, asserted for camera, microphone, geolocation, notifications and
+   clipboard-read.
+4. `applyCspHeaders(existingHeaders, policy)` is pure; an existing
+   `Content-Security-Policy` is replaced, not appended to, case-insensitively.
+5. `resolveAppPaths` gains `crashDumps` under `userData`, and main calls
+   `app.setPath('crashDumps', …)`.
+6. `tests/security/` exists as a Vitest project. With the bundle absent every
+   test **fails** naming `pnpm build`; none skips.
+7. The built main bundle imports none of `node:http`, `node:https`, `http`,
+   `https`, `node:net`, `node:dgram` — matched in import position — and contains
+   no `fetch(` call.
+8. Every `http`/`https`/`ws`/`wss` literal in the built main bundle names
+   `127.0.0.1`, `localhost` or `[::1]`. The allowlist is a named constant with a
+   comment: MS-08's inference adapter must pass deliberately.
+9. The built main bundle contains no `crashReporter.start`.
+10. US-02's assertions are extended, never duplicated or rewritten.
+11. `pnpm typecheck`, `lint`, `format:check`, `build` and `test` all exit 0.
+
+## Technical considerations
+
+**Why pure decision functions rather than mocks.** Every criterion is an
+Electron event handler. Mocking `session`, `BrowserWindow` and `app` would test
+the mock — it drifts from the real API and needs rewriting whenever Electron
+moves. Extracting the decision keeps the test honest and main free of logic,
+which is the pattern US-02 established.
+
+**The gap this leaves.** These tests prove the *decision*, not the *wiring*.
+Nothing headless can prove `setPermissionRequestHandler` was handed the right
+function. That is one line per handler, reviewed by eye. Recording the gap beats
+a mock that only tests itself.
+
+**`shouldAllowNavigation` takes the origin as an argument** because deriving it
+needs `import.meta.env.DEV`, which would make it impure.
+
+**The greps must be precise or they will be deleted.** A rule that
+false-positives once gets disabled the next time it is inconvenient. Hence
+import-position matching, and hence the renderer bundle staying out: React
+embeds `https://react.dev` in error messages and would fail on day one for a
+reason unrelated to egress.
+
+**Dependencies.** None.
+
+## Out of scope
+
+- Renderer bundle scanning, with the React-URL problem as the stated reason.
+- Opening external links in the system browser — no user action produces one.
+- `session.webRequest.onBeforeRequest` request blocking; it interacts with the
+  dev server and belongs to the first story that loads remote-shaped content.
+- A source lint rule banning `fetch`/`node:http`; the bundle grep covers the
+  artifact that ships. MS-08 is where a source rule with an exception belongs.
+- CI wiring and build ordering — US-04.
+- An ADR. This implements decisions already in [security.md](../security.md).
+
+## Testing requirements
+
+All in Vitest, no Electron.
+
+1. `navigation.test.ts` — table-driven over the app origin, a sibling directory
+   sharing the prefix, `https:`, `http:`, protocol-relative, `javascript:`,
+   `about:blank`, a file outside the app, and a `data:` URL.
+2. `permissions.test.ts` — the five named permissions plus one the code has
+   never seen.
+3. `csp.test.ts` — extended: added when absent, replaced when present, replaced
+   once when differently cased.
+4. `paths.test.ts` — extended for `crashDumps`.
+5. `tests/security/bundle.test.ts` — existence first, then imports, URL
+   literals, and `crashReporter.start`.
+6. Each guard verified by making it fail on purpose, then reverting. Nothing
+   deliberately broken is committed.

@@ -12,6 +12,12 @@ export interface AppPaths {
   readonly blobs: string;
   readonly renders: string;
   readonly tmp: string;
+  /**
+   * Kept inside userData so a crash dump — which can contain fragments of a
+   * document's contents in memory — never lands in an OS-wide location that
+   * something else might collect (docs/security.md, "No telemetry").
+   */
+  readonly crashDumps: string;
 }
 
 export function resolveAppPaths(userDataDir: string): AppPaths {
@@ -20,5 +26,6 @@ export function resolveAppPaths(userDataDir: string): AppPaths {
     blobs: join(userDataDir, 'blobs'),
     renders: join(userDataDir, 'renders'),
     tmp: join(userDataDir, 'tmp'),
+    crashDumps: join(userDataDir, 'crash-dumps'),
   };
 }

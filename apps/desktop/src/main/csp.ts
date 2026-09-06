@@ -19,3 +19,26 @@ export function contentSecurityPolicy(): string {
     "font-src 'self'",
   ].join('; ');
 }
+
+/**
+ * Applies the policy to a response's headers.
+ *
+ * An existing `Content-Security-Policy` is replaced, never appended to. Two CSP
+ * headers are not additive — the browser enforces the intersection, so an
+ * upstream header could only ever loosen what we intend or break the page in a
+ * way that invites someone to relax our policy instead. Header names are
+ * case-insensitive, so the match is too.
+ */
+export function applyCspHeaders(
+  existingHeaders: Record<string, string[]> | undefined,
+  policy: string,
+): Record<string, string[]> {
+  const headers: Record<string, string[]> = {};
+  for (const [name, value] of Object.entries(existingHeaders ?? {})) {
+    if (name.toLowerCase() !== 'content-security-policy') {
+      headers[name] = value;
+    }
+  }
+  headers['Content-Security-Policy'] = [policy];
+  return headers;
+}
