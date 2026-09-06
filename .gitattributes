@@ -1,0 +1,19 @@
+# Line endings are LF in the repository and LF in every working tree.
+#
+# Without this, Git converts text files to CRLF when checking out on Windows.
+# Prettier then reports every file in the repository as incorrectly formatted,
+# and the same mismatch reaches ESLint and any test that compares file contents
+# byte for byte. It fails on Windows and is invisible on macOS — which is the
+# category of bug ADR-0002 makes Windows the primary test platform for.
+* text=auto eol=lf
+
+# Binary files must never be line-ending converted. The fixture PDFs arriving at
+# MS-03 are the reason this matters here: a converted PDF is a corrupt PDF, and
+# it would corrupt silently.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary

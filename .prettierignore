@@ -1,0 +1,7 @@
+dist/
+out/
+pnpm-lock.yaml
+
+# Markdown here is hand-wrapped at 80 columns and contains ASCII diagrams that
+# a reflow would destroy.
+**/*.md

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
-    "defaultMode": "default",
     "allow": [
       "Read",
       "Glob",
@@ -44,22 +43,14 @@
       "Bash(find *)",
       "Bash(rg *)",
       "Bash(mkdir *)",
-      "Bash(sqlite3 *)"
-    ],
-    "ask": [
-      "Bash(pnpm add *)",
-      "Bash(pnpm remove *)",
-      "Bash(pnpm update *)",
-      "Bash(npm install *)",
-      "Bash(npm i *)",
-      "Bash(brew install *)",
-      "Bash(git rm *)",
-      "Bash(git reset *)",
-      "Bash(git rebase *)",
-      "Bash(git clean *)",
-      "Bash(rm *)",
-      "Bash(mv *)",
-      "Bash(cp *)"
+      "Bash(sqlite3 *)",
+      "Bash(pnpm format:check)",
+      "Bash(cat .npmrc)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm --filter @app/desktop exec electron --version)",
+      "Bash(node -e \"console.log\\(require\\('/Users/chedlimarzougui/saas/manufacturing/node_modules/.pnpm/electron@44.2.0/node_modules/electron/index.js'\\)\\)\")",
+      "Bash(python3 -)",
+      "Bash(python3 -c ' *)"
     ],
     "deny": [
       "Bash(git push *)",
@@ -99,6 +90,22 @@
       "Read(//**/id_ed25519*)",
       "Edit(//**/.env)",
       "Edit(//**/.env.*)"
-    ]
+    ],
+    "ask": [
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)",
+      "Bash(pnpm update *)",
+      "Bash(npm install *)",
+      "Bash(npm i *)",
+      "Bash(brew install *)",
+      "Bash(git rm *)",
+      "Bash(git reset *)",
+      "Bash(git rebase *)",
+      "Bash(git clean *)",
+      "Bash(rm *)",
+      "Bash(mv *)",
+      "Bash(cp *)"
+    ],
+    "defaultMode": "default"
   }
 }

@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+# No `onlyBuiltDependencies` entry, deliberately. `.npmrc` disables install
+# scripts for everything, and nothing in the tree needs one:
+#
+#   electron  downloads its binary lazily on first invocation, not at install
+#   esbuild   ships prebuilt platform packages as optional dependencies
+#
+# The first dependency that genuinely cannot work without its install script is
+# allowlisted here, by name, one at a time — `better-sqlite3` is the expected
+# first entry at MS-02.
